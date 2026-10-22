@@ -168,17 +168,14 @@ for doc in leads:
     cliente_id = doc.id
     dados = doc.to_dict()
 
-    # Trava 1: Etapas concluídas
     etapa_atual = dados.get("reativacaoEtapa", 0)
     if etapa_atual >= TOTAL_ETAPAS:
         continue
 
-    # Trava 2: Status comercial
     status_crm = dados.get("status", "").lower()
     if status_crm in ["vendido", "perdido", "desistiu", "cancelado"]:
         continue
 
-    # Consulta mensagens recentes
     msgs_stream = (
         doc.reference.collection("mensagens")
         .order_by("timestamp", direction=firestore.Query.DESCENDING)
@@ -187,7 +184,6 @@ for doc in leads:
     )
     historico = [m.to_dict() for m in msgs_stream]
 
-    # Trava 3: Quantidade mínima de mensagens
     if len(historico) < MINIMO_MENSAGENS:
         continue
 
@@ -195,7 +191,6 @@ for doc in leads:
     remetente = ultima_msg.get("sender")
     status_msg = ultima_msg.get("status", "delivered")
 
-    # Trava 4: Apenas se a última mensagem foi da loja/bot
     if remetente not in ["vendedor", "bot", "stella", "ia", "Stella IA"]:
         continue
 
@@ -211,11 +206,9 @@ for doc in leads:
     horas_silencio = segundos_silencio / 3600
     minutos_silencio = segundos_silencio / 60
 
-    # Trava 5: Janela máxima de inatividade
     if horas_silencio > JANELA_MAX_HORAS:
         continue
 
-    # Verificação de tempo da etapa no Firestore
     proxima_etapa = etapa_atual + 1
     tempo_necessario = INTERVALOS_MINUTOS.get(f"etapa_{proxima_etapa}")
 
@@ -238,14 +231,44 @@ for doc in leads:
         print("❌ Mensagem não gerada pela IA. Pulando disparo.")
         continue
 
-    # Disparo no WhatsApp
     status_code, resp_meta = enviar_whatsapp(cliente_id, texto_envio)
 
     if status_code in [200, 201]:
         wamid = resp_meta.get("messages", [{}])[0].get("id") or f"wamid.reativacao_{proxima_etapa}_{int(agora_utc.timestamp())}"
         print(f"✅ Disparo concluído com sucesso. WAMID: {wamid}")
 
-        # Grava na subcoleção 'reativacoes'
         doc.reference.collection("reativacoes").document(f"etapa_{proxima_etapa}").set({
             "etapa": proxima_etapa,
-            "statusUltimaMensagem
+            "statusUltimaMensagemLead": modo,
+            "mensagemEnviada": texto_envio,
+            "enviadoPor": NOME_IA,
+            "geradoPorIa": True,
+            "idMensagemMeta": wamid,
+            "timestamp": agora_iso,
+            "tempoSilencioMinutos": round(minutos_silencio, 2)
+        })
+
+        doc.reference.collection("mensagens").document(wamid).set({
+            "fileName": "",
+            "id": wamid,
+            "mediaType": None,
+            "mediaUrl": None,
+            "sender": "stella",
+            "senderName": NOME_IA,
+            "status": "sent",
+            "statusUpdatedAt": agora_iso,
+            "text": texto_envio,
+            "time": hora_formatada,
+            "timestamp": agora_iso,
+            "wamid": wamid
+        })
+
+        doc.reference.update({
+            "reativacaoEtapa": proxima_etapa,
+            "totalReativacoes": proxima_etapa,
+            "ultimaReativacaoEm": agora_iso
+        })
+    else:
+        print(f"❌ Erro na API do WhatsApp: {resp_meta}")
+
+print("\n🏁 Execução do ciclo de reativação finalizada com sucesso.")
