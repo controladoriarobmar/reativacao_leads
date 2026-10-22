@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Ambientes Virtuais
+venv/
+.venv/
+env/
+ENV/
+
+# Credenciais e segredos locais (segurança)
+*.json
+*.env
+.env.*
+
+# Ficheiros do Sistema Operativo
+.DS_Store
+Thumbs.db
+
+# Logs e IDEs
+*.log
+.vscode/
+.idea/
