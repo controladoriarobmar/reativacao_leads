@@ -20,7 +20,7 @@ def _normalizar_telefone_br(telefone):
     return digits
 
 def processar_agendamentos(cfg, meta_data, agora_utc, agora_br, clientes_processados):
-    print("\n📅 [MÓDULO 1] Verificando agendamentos ativos...")
+    print("\n📅 [MÓDULO 1] Verificando agendamentos ativos (apenas Visitas)...")
     ia_cfg = cfg.get("iaConfig", {})
     nome_ia = ia_cfg.get("identidadeNome", "Stella")
     cargo_ia = ia_cfg.get("cargoIdentidade", "Consultora Digital de Vendas")
@@ -38,6 +38,12 @@ def processar_agendamentos(cfg, meta_data, agora_utc, agora_br, clientes_process
 
     for ag_doc in agendamentos_stream:
         ag = ag_doc.to_dict()
+
+        # Filtra exclusivamente agendamentos do tipo VISITA (ignora LIGAÇÃO e RETORNO)
+        tipo_agendamento = str(ag.get("Tipo") or "").strip().upper()
+        if tipo_agendamento != "VISITA":
+            continue
+
         data_visita = ag.get("Data")
         hora_visita = ag.get("Hora", "10:00")
         loja_id = ag.get("storeId") or "robmar-carros"
@@ -158,4 +164,4 @@ Escreva uma mensagem curta e natural para WhatsApp (máximo 3 frases), sem parec
             clientes_processados.add(f"{loja_id}:{telefone}")
             total_disparos += 1
 
-    print(f"📅 [MÓDULO 1] Concluído. Confirmações enviadas: {total_disparos}")
+    print(f"📅 [MÓDULO 1] Concluído. Confirmações de visita enviadas: {total_disparos}")
